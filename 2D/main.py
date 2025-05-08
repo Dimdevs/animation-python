@@ -1,93 +1,97 @@
 import pygame
-import os
+import random
 
 pygame.init()
-screen = pygame.display.set_mode((800, 600))
-pygame.display.set_caption("Primitive")
-clock = pygame.time.Clock()
 
-# Memuat gambar latar belakang dari folder 'assets'
-background_morning = pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets', "background-morning.png"))
-background_afternoon = pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets', "background-afternoon.png"))
+screen_width = 800
+screen_height = 600
+screen = pygame.display.set_mode((screen_width, screen_height))
+pygame.display.set_caption("Ping Pong Game")
 
-# Mengubah ukuran latar belakang agar sesuai dengan layar
-background_morning = pygame.transform.scale(background_morning, (800, 600))
-background_afternoon = pygame.transform.scale(background_afternoon, (800, 600))
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
 
-# Memuat gambar karakter (manusia, herbivora, karnivora)
-human_image = pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets', "human.png"))
-herbivore_image = pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets', "herbivore.png"))
-carnivore_image = pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets', "carnivore.png"))
+ball_speed_x = 7
+ball_speed_y = 7
+paddle_speed = 10
 
-# Posisi awal karakter (Herbivore, Carnivore, Human)
-herbivore_pos = [1000, 350]  # Herbivore starts on the far right
-carnivore_pos = [850, 375]   # Carnivore starts slightly to the left of the herbivore (adjusted y-position)
-human_pos = [750, 400]       # Human starts to the left of the carnivore (adjusted y-position)
+paddle_width = 15
+paddle_height = 100
+player_x = 50
+player_y = (screen_height - paddle_height) // 2
+opponent_x = screen_width - paddle_width - 50
+opponent_y = (screen_height - paddle_height) // 2
 
-# Kecepatan pergerakan karakter
-human_speed = 2
-herbivore_speed = 2
-carnivore_speed = 2
+ball_width = 20
+ball_x = screen_width // 2 - ball_width // 2
+ball_y = screen_height // 2 - ball_width // 2
 
-# Status permainan
+player_score = 0
+opponent_score = 0
+
+def draw_objects():
+    screen.fill(BLACK)
+    pygame.draw.rect(screen, WHITE, (player_x, player_y, paddle_width, paddle_height))
+    pygame.draw.rect(screen, WHITE, (opponent_x, opponent_y, paddle_width, paddle_height))
+    pygame.draw.ellipse(screen, WHITE, (ball_x, ball_y, ball_width, ball_width))
+    pygame.draw.aaline(screen, WHITE, (screen_width // 2, 0), (screen_width // 2, screen_height))
+    font = pygame.font.Font(None, 36)
+    score_text = font.render(f"{player_score} - {opponent_score}", True, WHITE)
+    screen.blit(score_text, (screen_width // 2 - score_text.get_width() // 2, 20))
+
+def update_ball():
+    global ball_x, ball_y, ball_speed_x, ball_speed_y, player_score, opponent_score
+    ball_x += ball_speed_x
+    ball_y += ball_speed_y
+    if ball_y <= 0 or ball_y >= screen_height - ball_width:
+        ball_speed_y *= -1
+    if ball_x <= player_x + paddle_width and player_y <= ball_y + ball_width <= player_y + paddle_height:
+        ball_speed_x *= -1
+        ball_speed_y += random.choice([-1, 1])
+    if ball_x >= opponent_x - ball_width and opponent_y <= ball_y + ball_width <= opponent_y + paddle_height:
+        ball_speed_x *= -1
+        ball_speed_y += random.choice([-1, 1])
+    if ball_x <= 0:
+        opponent_score += 1
+        reset_ball()
+    elif ball_x >= screen_width:
+        player_score += 1
+        reset_ball()
+
+def reset_ball():
+    global ball_x, ball_y, ball_speed_x, ball_speed_y
+    ball_x = screen_width // 2 - ball_width // 2
+    ball_y = screen_height // 2 - ball_width // 2
+    ball_speed_x *= random.choice([1, -1])
+    ball_speed_y *= random.choice([1, -1])
+
+def move_paddle_player():
+    global player_y
+    keys = pygame.key.get_pressed()
+    if keys[pygame.K_w] and player_y > 0:
+        player_y -= paddle_speed
+    if keys[pygame.K_s] and player_y < screen_height - paddle_height:
+        player_y += paddle_speed
+
+# Fungsi untuk menggerakkan paddle lawan (AI)
+def move_paddle_opponent():
+    global opponent_y
+    if opponent_y + paddle_height / 2 < ball_y + ball_width / 2:
+        opponent_y += paddle_speed
+    elif opponent_y + paddle_height / 2 > ball_y + ball_width / 2:
+        opponent_y -= paddle_speed
+    opponent_y = max(0, min(screen_height - paddle_height, opponent_y))
+
 running = True
-start_time = pygame.time.get_ticks()  # Waktu mulai program
-bg_change_delay = 3000  # Waktu dalam milidetik untuk perubahan latar belakang (3 detik)
-bg_state = "morning"  # Status latar belakang
-
 while running:
-    current_time = pygame.time.get_ticks()  # Waktu saat ini
-
-    # Mengganti latar belakang setelah beberapa detik dan berulang
-    if current_time - start_time >= bg_change_delay:
-        if bg_state == "morning":
-            bg_state = "afternoon"
-        else:
-            bg_state = "morning"
-        
-        start_time = current_time  # Reset waktu mulai untuk interval berikutnya
-
-    # Memilih latar belakang sesuai dengan waktu
-    if bg_state == "morning":
-        screen.blit(background_morning, (0, 0))
-    else:
-        screen.blit(background_afternoon, (0, 0))
-
-    # Menggerakkan karakter:
-    # Herbivora bergerak ke kiri
-    herbivore_pos[0] -= herbivore_speed
-
-    # Karnivora mengejar herbivora
-    if carnivore_pos[0] > herbivore_pos[0]:
-        carnivore_pos[0] -= carnivore_speed  # Ke kiri untuk mengejar herbivora
-    else:
-        carnivore_pos[0] += carnivore_speed  # Ke kanan jika sudah lewat
-
-    # Manusia mengejar karnivora
-    if human_pos[0] > carnivore_pos[0]:
-        human_pos[0] -= human_speed  # Ke kiri untuk mengejar karnivora
-    else:
-        human_pos[0] += human_speed  # Ke kanan jika sudah lewat
-
-    # Reset posisi karakter ketika keluar dari layar (looping efek)
-    if herbivore_pos[0] < -100:
-        herbivore_pos[0] = 1000  # Reset herbivore to the far right
-    if carnivore_pos[0] < -100:
-        carnivore_pos[0] = 1000  # Reset carnivore to the right of herbivore
-    if human_pos[0] < -100:
-        human_pos[0] = 1000  # Reset human to the left of carnivore
-
-    # Menggambar karakter
-    screen.blit(human_image, human_pos)
-    screen.blit(herbivore_image, herbivore_pos)
-    screen.blit(carnivore_image, carnivore_pos)
-
-    pygame.display.flip()  # Update tampilan
-    clock.tick(60)  # Kecepatan frame
-
-    # Mengecek apakah jendela ditutup
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-
+    move_paddle_player()
+    move_paddle_opponent()
+    update_ball()
+    draw_objects()
+    pygame.display.flip()
+    pygame.time.Clock().tick(60)
 pygame.quit()
